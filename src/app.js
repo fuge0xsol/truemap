@@ -114,9 +114,9 @@ function buildTiles(){
       t.gLand=g.append('g');
       t.gDots=g.append('g');
       t.gGhost=g.append('g').style('display','none').style('pointer-events','none');
-      t.gCirc=t.gGhost.append('circle').attr('fill-opacity',0.22).attr('stroke','#fff').attr('stroke-width',1.4).attr('stroke-dasharray','5 4');
-      t.gShp=t.gGhost.append('path').attr('fill-opacity',0.22).attr('stroke','#fff').attr('stroke-width',1.4)
-        .attr('stroke-dasharray','5 4').attr('vector-effect','non-scaling-stroke').attr('stroke-linejoin','round').style('display','none');
+      t.gCirc=t.gGhost.append('circle').attr('fill-opacity',0.45).attr('stroke','#fff').attr('stroke-width',2).attr('stroke-dasharray','6 4').attr('vector-effect','non-scaling-stroke');
+      t.gShp=t.gGhost.append('path').attr('fill-opacity',0.45).attr('stroke','#fff').attr('stroke-width',2)
+        .attr('stroke-dasharray','6 4').attr('vector-effect','non-scaling-stroke').attr('stroke-linejoin','round').style('display','none');
       t.gTxt=t.gGhost.append('text').attr('text-anchor','middle').attr('dy',-8).attr('fill','#fff')
         .attr('font-size',12).attr('font-weight',600).attr('paint-order','stroke').attr('stroke','rgba(0,0,0,.55)').attr('stroke-width',3);
       t.gLand.selectAll('path').data(features,function(d){return d._i;}).join('path')
@@ -337,6 +337,7 @@ function moveGhost(sx,sy){
     var ll=projection.invert([mapX,mapY]);
     if(!ll)return;
     var dLon=ll[0]-r.f.centroid[0],dLat=ll[1]-r.f.centroid[1];
+    dLon=((dLon+180)%360+360)%360-180; // 经度差归一化到±180,避免不必要的跨线切割
     ghostFeature.geometry.type=r.f.geometry.type;
     ghostFeature.geometry.coordinates=shiftedGeometry(r.f.geometry,dLon,dLat);
     var d=ghostPath(ghostFeature)||r.f.pathD;
