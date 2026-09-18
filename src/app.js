@@ -98,7 +98,8 @@ var tooltip=document.getElementById('tooltip');
 
 var projection=d3.geoMercator();
 var path=d3.geoPath(projection);
-var ghostPath=d3.geoPath(projection);
+var ghostProjection=d3.geoMercator(); // 幽灵专用:旋转到光标经度,轮廓永不跨反经线
+var ghostPath=d3.geoPath(ghostProjection);
 var ghostFeature={type:'Feature',geometry:{type:'Polygon',coordinates:[]}};
 var W=0,H=0,maxR=80,worldW=0;
 
@@ -143,6 +144,7 @@ function setup(){
   worldW=H;                // world square width in px (== height): horizontal wrap period
   projection.scale(scale).translate([W/2,H/2]).center([0,0])
     .clipExtent([[-worldW,0],[2*worldW,worldW]]);
+  ghostProjection.scale(scale).translate([W/2,H/2]).center([0,0]); // 幽灵投影:同比例,d3默认世界方格裁剪
   maxR=H*0.185;
   features.forEach(function(f){
     var p=projection(f.centroid);
@@ -333,18 +335,21 @@ function moveGhost(sx,sy){
   var r=byIso[lastSel];
   if(!r)return;
   if(shapeMode&&mode==='area'){
-    // thetruesize 行为:轮廓在光标处按墨卡托重新投影 — 拖向赤道变小,拖向两极变大
-    // 注意:保留原始经度差(不归一化),否则跨日期变更线时轮廓会被投影到屏幕外
+    // thetruesize 行为:轮廓在光标处按墨卡托重新投影 — 拖向赤道变小,拖向两极变大。
+    // 几何平移到"绝对经度 = -光标经度"处:旋转后质心恰在投影中心,
+    // 幽灵永不跨越反经线 — 任何拖放位置都完整显示
     var ll=projection.invert([mapX,mapY]);
     if(!ll)return;
-    var dLon=ll[0]-r.f.centroid[0],dLat=ll[1]-r.f.centroid[1];
+    var dLon=-ll[0]-r.f.centroid[0],dLat=ll[1]-r.f.centroid[1];
+    ghostProjection.rotate([-ll[0],0]);
     ghostFeature.geometry.type=r.f.geometry.type;
     ghostFeature.geometry.coordinates=shiftedGeometry(r.f.geometry,dLon,dLat);
     var d=ghostPath(ghostFeature)||r.f.pathD;
     tiles.forEach(function(t){
-      t.gGhost.attr('transform','translate('+((t.i-1)*worldW)+',0)');
+      var lx=mapX-(t.i-1)*worldW;
+      t.gGhost.attr('transform','translate('+(lx-W/2)+','+(mapY-H/2)+')');
       t.gShp.attr('d',d);
-      t.gTxt.attr('x',mapX).attr('y',mapY-8);
+      t.gTxt.attr('x',lx).attr('y',mapY-8);
     });
     return;
   }
