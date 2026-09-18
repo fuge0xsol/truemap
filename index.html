@@ -189,6 +189,8 @@ var tooltip=document.getElementById('tooltip');
 
 var projection=d3.geoMercator();
 var path=d3.geoPath(projection);
+var ghostPath=d3.geoPath(projection);
+var ghostFeature={type:'Feature',geometry:{type:'Polygon',coordinates:[]}};
 var W=0,H=0,maxR=80;
 
 function buildTiles(){
@@ -392,9 +394,12 @@ function refreshSel(){
     if(r){
       t.gGhost.style('display',null);
       if(shapeMode){
+        // True Area: 幽灵初始落在原位,移动鼠标后按光标纬度重投影
+        t.gGhost.attr('transform',mode==='area'?null:'translate(0,0)');
         t.gShp.style('display',null).attr('d',r.f.pathD).attr('fill',RG_COLOR[r.f.rg]);
         t.gCirc.style('display','none');
       }else{
+        t.gGhost.attr('transform','translate('+r.f.px+','+r.f.py+')');
         t.gCirc.style('display',null).attr('r',r.r).attr('fill',RG_COLOR[r.f.rg]);
         t.gShp.style('display','none');
       }
@@ -413,11 +418,35 @@ function moveGhost(sx,sy){
   var mapX=(sx-tx)/k,mapY=(sy-ty)/k;
   var r=byIso[lastSel];
   if(!r)return;
+  if(shapeMode&&mode==='area'){
+    // thetruesize 行为:轮廓在光标处按墨卡托重新投影 — 拖向赤道变小,拖向两极变大
+    var ll=projection.invert([mapX,mapY]);
+    if(!ll)return;
+    var dLon=ll[0]-r.f.centroid[0],dLat=ll[1]-r.f.centroid[1];
+    ghostFeature.geometry.type=r.f.geometry.type;
+    ghostFeature.geometry.coordinates=shiftedGeometry(r.f.geometry,dLon,dLat);
+    var d=ghostPath(ghostFeature)||r.f.pathD;
+    tiles.forEach(function(t){
+      t.gGhost.attr('transform','translate('+((t.i-1)*W)+',0)');
+      t.gShp.attr('d',d);
+      t.gTxt.attr('x',mapX).attr('y',mapY-8);
+    });
+    return;
+  }
   tiles.forEach(function(t){
     var lx=mapX-(t.i-1)*W;
-    if(shapeMode)t.gGhost.attr('transform','translate('+lx+','+mapY+') scale('+r.s+') translate('+(-r.f.cx)+','+(-r.f.cy)+')');
-    else t.gGhost.attr('transform','translate('+lx+','+mapY+')');
+    if(shapeMode){
+      t.gGhost.attr('transform','translate('+lx+','+mapY+') scale('+r.s+') translate('+(-r.f.cx)+','+(-r.f.cy)+')');
+      t.gTxt.attr('x',0).attr('y',0);
+    }else{
+      t.gGhost.attr('transform','translate('+lx+','+mapY+')');
+    }
   });
+}
+function shiftedGeometry(geom,dLon,dLat){
+  function sh(ring){return ring.map(function(c){return [c[0]+dLon,c[1]+dLat];});}
+  if(geom.type==='Polygon')return geom.coordinates.map(sh);
+  return geom.coordinates.map(function(p){return p.map(sh);});
 }
 
 function tipHTML(f){
