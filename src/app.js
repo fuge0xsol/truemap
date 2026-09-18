@@ -93,20 +93,22 @@ var svg=d3.select('#map');
 var root=svg.append('g');
 var gTiles=root.append('g');
 var tiles=[];
+var nTiles=3;
 var tooltip=document.getElementById('tooltip');
 
 var projection=d3.geoMercator();
 var path=d3.geoPath(projection);
 var ghostPath=d3.geoPath(projection);
 var ghostFeature={type:'Feature',geometry:{type:'Polygon',coordinates:[]}};
-var W=0,H=0,maxR=80,yTopW=0,yBotW=0;
+var W=0,H=0,maxR=80,worldW=0;
 
 function buildTiles(){
   gTiles.selectAll('g.tile').remove();
   tiles=[];
-  for(var i=0;i<3;i++){
+  nTiles=Math.max(3,Math.ceil(W/worldW)+2);
+  for(var i=0;i<nTiles;i++){
     (function(i){
-      var g=gTiles.append('g').attr('class','tile').attr('transform','translate('+((i-1)*W)+',0)');
+      var g=gTiles.append('g').attr('class','tile').attr('transform','translate('+((i-1)*worldW)+',0)');
       var t={i:i,g:g};
       t.gGrat=g.append('path').attr('fill','none').attr('stroke','#141d33').attr('stroke-width',0.5);
       t.gLand=g.append('g');
@@ -137,9 +139,10 @@ function setup(){
   var r=stage.getBoundingClientRect();
   W=r.width;H=r.height;
   svg.attr('viewBox','0 0 '+W+' '+H);
-  var scale=W/(2*Math.PI); // world width exactly fills the viewport for seamless wrap
+  var scale=H/(2*Math.PI); // full Mercator world square (±85.05°, both poles) fits the viewport height
+  worldW=H;                // world square width in px (== height): horizontal wrap period
   projection.scale(scale).translate([W/2,H/2]).center([0,0])
-    .clipExtent([[-W,H/2-W/2],[2*W,H/2+W/2]]); // full Mercator world square (lat ±85.05°), poles included
+    .clipExtent([[-worldW,0],[2*worldW,worldW]]);
   maxR=H*0.185;
   features.forEach(function(f){
     var p=projection(f.centroid);
@@ -151,15 +154,16 @@ function setup(){
     f.cy=isNaN(c[1])?f.py:c[1];
   });
   buildTiles();
-  k=1;tx=0;
-  yTopW=H/2-W/2;yBotW=H/2+W/2; // top/bottom edges of the world square (±85.05°)
-  ty=Math.min(-yTopW,Math.max(H-yBotW,0)); // start equator-centered
+  k=1;
+  tx=(W-worldW)/2; // center one world copy on screen
+  ty=0;            // full square visible on open: 85°N … 85°S, no pan/zoom needed
   applyView();
 }
 
 function clampPan(){
-  tx=((tx%W)+W)%W;
-  var lo=H-yBotW*k,hi=-yTopW*k;
+  var P=worldW*k;
+  tx=((tx%P)+P)%P;
+  var lo=H-worldW*k,hi=0;
   ty=lo<=hi?Math.min(hi,Math.max(lo,ty)):(lo+hi)/2;
 }
 function applyView(){
@@ -302,14 +306,16 @@ function refreshSel(){
     if(r){
       t.gGhost.style('display',null);
       if(shapeMode){
-        // True Area: 幽灵初始落在原位,移动鼠标后按光标纬度重投影
-        t.gGhost.attr('transform',mode==='area'?null:'translate(0,0)');
+        // 幽灵初始落在原位,移动鼠标后跟随光标(True Area 模式按光标纬度重投影)
+        t.gGhost.attr('transform',null);
         t.gShp.style('display',null).attr('d',r.f.pathD).attr('fill',RG_COLOR[r.f.rg]);
         t.gCirc.style('display','none');
+        t.gTxt.attr('x',r.f.cx).attr('y',r.f.cy);
       }else{
         t.gGhost.attr('transform','translate('+r.f.px+','+r.f.py+')');
         t.gCirc.style('display',null).attr('r',r.r).attr('fill',RG_COLOR[r.f.rg]);
         t.gShp.style('display','none');
+        t.gTxt.attr('x',0).attr('y',0);
       }
       t.gTxt.text(r.f.name+' · '+(mode==='area'?'true size':MODES[mode].label+' equal-area'));
     }else{
@@ -335,14 +341,14 @@ function moveGhost(sx,sy){
     ghostFeature.geometry.coordinates=shiftedGeometry(r.f.geometry,dLon,dLat);
     var d=ghostPath(ghostFeature)||r.f.pathD;
     tiles.forEach(function(t){
-      t.gGhost.attr('transform','translate('+((t.i-1)*W)+',0)');
+      t.gGhost.attr('transform','translate('+((t.i-1)*worldW)+',0)');
       t.gShp.attr('d',d);
       t.gTxt.attr('x',mapX).attr('y',mapY-8);
     });
     return;
   }
   tiles.forEach(function(t){
-    var lx=mapX-(t.i-1)*W;
+    var lx=mapX-(t.i-1)*worldW;
     if(shapeMode){
       t.gGhost.attr('transform','translate('+lx+','+mapY+') scale('+r.s+') translate('+(-r.f.cx)+','+(-r.f.cy)+')');
       t.gTxt.attr('x',0).attr('y',0);
