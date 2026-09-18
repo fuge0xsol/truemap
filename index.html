@@ -134,7 +134,7 @@ var shapeMode=!/circle/i.test(location.search);
 var ANIM=true;
 try{ANIM=!/static=1/.test(location.search)&&!matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
 
-var recs=[],byIso={},maxV=1;
+var recs=[],byIso={},maxV=1,worldTotal=0;
 var selSet=new Set(),lastSel=null,hoverIso=null;
 var tx=0,ty=0,k=1,dragging=false,dragMoved=false,lastPt=null,lastMouse=null;
 var firstRender=true;
@@ -162,8 +162,8 @@ features.forEach(function(f,i){
   f.centroid=bigCentroid(f.geometry);
 });
 
-var AREA_VALS=null,worldTotal=0;
-function getAreaVals(){ // km² per country, computed once from the geometry
+var AREA_VALS=null;
+function getAreaVals(){
   if(!AREA_VALS){
     AREA_VALS={};
     var R2=6371*6371;
@@ -182,36 +182,59 @@ function dataOf(iso3){
 
 var stage=document.getElementById('stage');
 var svg=d3.select('#map');
-var root=svg.append('g');
+var root=svg.append('g');           // 缩放/平移作用于此层(底图+数据图形)
 var gTiles=root.append('g');
 var tiles=[];
-var nTiles=3;
+// 幽灵层:独立于 root,直接用屏幕坐标,避免任何坐标系混合
+var gGhost=svg.append('g').style('display','none').style('pointer-events','none');
+var gShp=gGhost.append('path').attr('fill-opacity',0.45).attr('stroke','#fff').attr('stroke-width',2)
+  .attr('stroke-dasharray','6 4').attr('vector-effect','non-scaling-stroke').attr('stroke-linejoin','round');
+var gCirc=gGhost.append('circle').attr('fill-opacity',0.45).attr('stroke','#fff').attr('stroke-width',2)
+  .attr('stroke-dasharray','6 4').style('display','none');
+var gTxt=gGhost.append('text').attr('text-anchor','middle').attr('dy',-12).attr('fill','#fff')
+  .attr('font-size',13).attr('font-weight',600).attr('paint-order','stroke').attr('stroke','rgba(0,0,0,.55)').attr('stroke-width',3);
 var tooltip=document.getElementById('tooltip');
 
 var projection=d3.geoMercator();
 var path=d3.geoPath(projection);
-var ghostProjection=d3.geoMercator(); // 幽灵专用:旋转到光标经度,轮廓永不跨反经线
-var ghostPath=d3.geoPath(ghostProjection);
-var ghostFeature={type:'Feature',geometry:{type:'Polygon',coordinates:[]}};
 var W=0,H=0,maxR=80,worldW=0;
+
+function bigProjSetup(){
+  var r=stage.getBoundingClientRect();
+  W=r.width;H=r.height;
+  svg.attr('viewBox','0 0 '+W+' '+H);
+  var scale=H/(2*Math.PI); // full Mercator world square (±85.05°, both poles) fits the viewport height
+  worldW=H;
+  projection.scale(scale).translate([W/2,H/2]).center([0,0])
+    .clipExtent([[-worldW,0],[2*worldW,worldW]]);
+  maxR=H*0.185;
+  features.forEach(function(f){
+    var p=projection(f.centroid);
+    f.px=p?p[0]:0;f.py=p?p[1]:0;
+    f.pathD=path(f)||'';
+    f.area=Math.abs(path.area(f))||0;
+    var c=path.centroid(f);
+    f.cx=isNaN(c[0])?f.px:c[0];
+    f.cy=isNaN(c[1])?f.py:c[1];
+  });
+  buildTiles();
+  k=1;
+  tx=(W-worldW)/2; // center one world copy on screen
+  ty=0;
+  applyView();
+}
 
 function buildTiles(){
   gTiles.selectAll('g.tile').remove();
   tiles=[];
-  nTiles=Math.max(3,Math.ceil(W/worldW)+2);
-  for(var i=0;i<nTiles;i++){
+  var n=Math.max(3,Math.ceil(W/worldW)+2);
+  for(var i=0;i<n;i++){
     (function(i){
       var g=gTiles.append('g').attr('class','tile').attr('transform','translate('+((i-1)*worldW)+',0)');
       var t={i:i,g:g};
       t.gGrat=g.append('path').attr('fill','none').attr('stroke','#141d33').attr('stroke-width',0.5);
       t.gLand=g.append('g');
       t.gDots=g.append('g');
-      t.gGhost=g.append('g').style('display','none').style('pointer-events','none');
-      t.gCirc=t.gGhost.append('circle').attr('fill-opacity',0.45).attr('stroke','#fff').attr('stroke-width',2).attr('stroke-dasharray','6 4').attr('vector-effect','non-scaling-stroke');
-      t.gShp=t.gGhost.append('path').attr('fill-opacity',0.45).attr('stroke','#fff').attr('stroke-width',2)
-        .attr('stroke-dasharray','6 4').attr('vector-effect','non-scaling-stroke').attr('stroke-linejoin','round').style('display','none');
-      t.gTxt=t.gGhost.append('text').attr('text-anchor','middle').attr('dy',-8).attr('fill','#fff')
-        .attr('font-size',12).attr('font-weight',600).attr('paint-order','stroke').attr('stroke','rgba(0,0,0,.55)').attr('stroke-width',3);
       t.gLand.selectAll('path').data(features,function(d){return d._i;}).join('path')
         .attr('class','land')
         .attr('d',path)
@@ -226,32 +249,6 @@ function buildTiles(){
       tiles.push(t);
     })(i);
   }
-}
-
-function setup(){
-  var r=stage.getBoundingClientRect();
-  W=r.width;H=r.height;
-  svg.attr('viewBox','0 0 '+W+' '+H);
-  var scale=H/(2*Math.PI); // full Mercator world square (±85.05°, both poles) fits the viewport height
-  worldW=H;                // world square width in px (== height): horizontal wrap period
-  projection.scale(scale).translate([W/2,H/2]).center([0,0])
-    .clipExtent([[-worldW,0],[2*worldW,worldW]]);
-  ghostProjection.scale(scale).translate([W/2,H/2]).center([0,0]); // 幽灵投影:同比例,d3默认世界方格裁剪
-  maxR=H*0.185;
-  features.forEach(function(f){
-    var p=projection(f.centroid);
-    f.px=p?p[0]:0;f.py=p?p[1]:0;
-    f.pathD=path(f)||'';
-    f.area=Math.abs(path.area(f))||0;
-    var c=path.centroid(f);
-    f.cx=isNaN(c[0])?f.px:c[0];
-    f.cy=isNaN(c[1])?f.py:c[1];
-  });
-  buildTiles();
-  k=1;
-  tx=(W-worldW)/2; // center one world copy on screen
-  ty=0;            // full square visible on open: 85°N … 85°S, no pan/zoom needed
-  applyView();
 }
 
 function clampPan(){
@@ -291,7 +288,7 @@ function computeRecs(){
   recs.forEach(function(r,i){
     r.rank=i+1;r.share=r.d.v/total;
     r.r=Math.max(1.1,maxR*Math.sqrt(r.d.v/maxV));
-    r.s=mode==='area'?1:f2s(r.f,Math.max(maxArea*r.d.v/maxV,30)); // True Area 模式 s=1(真实比例)
+    r.s=mode==='area'?1:f2s(r.f,Math.max(maxArea*r.d.v/maxV,30));
   });
   byIso={};recs.forEach(function(r){byIso[r.f.iso3]=r;});
 }
@@ -394,72 +391,40 @@ function toggleSel(iso){
 
 function refreshSel(){
   restroke();
-  var r=lastSel?byIso[lastSel]:null;
   tiles.forEach(function(t){
     t.gDots.selectAll('text.lbl').text(function(d){return selSet.has(d.f.iso3)?d.f.name:'';});
-    if(r){
-      t.gGhost.style('display',null);
-      if(shapeMode){
-        // 幽灵初始落在原位,移动鼠标后跟随光标(True Area 模式按光标纬度重投影)
-        t.gGhost.attr('transform',null);
-        t.gShp.style('display',null).attr('d',r.f.pathD).attr('fill',RG_COLOR[r.f.rg]);
-        t.gCirc.style('display','none');
-        t.gTxt.attr('x',r.f.cx).attr('y',r.f.cy);
-      }else{
-        t.gGhost.attr('transform','translate('+r.f.px+','+r.f.py+')');
-        t.gCirc.style('display',null).attr('r',r.r).attr('fill',RG_COLOR[r.f.rg]);
-        t.gShp.style('display','none');
-        t.gTxt.attr('x',0).attr('y',0);
-      }
-      t.gTxt.text(r.f.name+' · '+(mode==='area'?'true size':MODES[mode].label+' equal-area'));
-    }else{
-      t.gGhost.style('display','none');
-    }
   });
-  if(r&&lastMouse)moveGhost(lastMouse[0],lastMouse[1]);
+  updateGhost();
   document.querySelectorAll('#rank .row').forEach(function(row){
     row.classList.toggle('act',selSet.has(row.dataset.iso));
   });
 }
 
-function moveGhost(sx,sy){
+function updateGhost(){
+  var r=lastSel?byIso[lastSel]:null;
+  if(!r){gGhost.style('display','none');return;}
+  var sx,sy;
+  if(lastMouse){sx=lastMouse[0];sy=lastMouse[1];}
+  else{sx=tx+r.f.px*k;sy=ty+r.f.py*k;}
   var mapX=(sx-tx)/k,mapY=(sy-ty)/k;
-  var r=byIso[lastSel];
-  if(!r)return;
-  if(shapeMode&&mode==='area'){
-    // thetruesize 行为:轮廓在光标处按墨卡托重新投影 — 拖向赤道变小,拖向两极变大。
-    // 几何平移到"绝对经度 = -光标经度"处:旋转后质心恰在投影中心,
-    // 幽灵永不跨越反经线 — 任何拖放位置都完整显示
-    var ll=projection.invert([mapX,mapY]);
-    if(!ll)return;
-    var dLon=ll[0]-r.f.centroid[0],dLat=ll[1]-r.f.centroid[1];
-    ghostProjection.rotate([-ll[0],0]);
-    ghostFeature.geometry.type=r.f.geometry.type;
-    ghostFeature.geometry.coordinates=shiftedGeometry(r.f.geometry,dLon,dLat);
-    var d=ghostPath(ghostFeature)||r.f.pathD;
-    var cxy=ghostProjection([ll[0],ll[1]])||[W/2,mapY]; // 幽灵质心的实际投影位置
-    tiles.forEach(function(t){
-      var lx=mapX-(t.i-1)*worldW;
-      t.gGhost.attr('transform','translate('+(lx-cxy[0])+',0)');
-      t.gShp.attr('d',d);
-      t.gTxt.attr('x',lx).attr('y',mapY-8);
-    });
-    return;
+  var ll=projection.invert([mapX,mapY]);
+  var latC=ll?ll[1]:r.f.centroid[1];
+  var s=1;
+  if(mode==='area'){
+    s=Math.cos(r.f.centroid[1]*Math.PI/180)/Math.max(0.087,Math.cos(latC*Math.PI/180)); // 真实尺寸随纬度 sec(φ) 变化
   }
-  tiles.forEach(function(t){
-    var lx=mapX-(t.i-1)*worldW;
-    if(shapeMode){
-      t.gGhost.attr('transform','translate('+lx+','+mapY+') scale('+r.s+') translate('+(-r.f.cx)+','+(-r.f.cy)+')');
-      t.gTxt.attr('x',0).attr('y',0);
-    }else{
-      t.gGhost.attr('transform','translate('+lx+','+mapY+')');
-    }
-  });
-}
-function shiftedGeometry(geom,dLon,dLat){
-  function sh(ring){return ring.map(function(c){return [c[0]+dLon,c[1]+dLat];});}
-  if(geom.type==='Polygon')return geom.coordinates.map(sh);
-  return geom.coordinates.map(function(p){return p.map(sh);});
+  gGhost.style('display',null);
+  if(shapeMode){
+    gShp.style('display',null).attr('d',r.f.pathD).attr('fill',RG_COLOR[r.f.rg])
+      .attr('transform','translate('+(sx-r.f.px*k*s)+','+(sy-r.f.py*k*s)+') scale('+(k*s)+')');
+    gCirc.style('display','none');
+  }else{
+    gCirc.style('display',null).attr('transform','translate('+sx+','+sy+')').attr('r',r.r*k*s)
+      .attr('fill',RG_COLOR[r.f.rg]);
+    gShp.style('display','none');
+  }
+  gTxt.style('display',null).attr('x',sx).attr('y',sy-12)
+    .text(r.f.name+' · '+(mode==='area'?'true size':MODES[mode].label+' equal-area'));
 }
 
 function tipHTML(f){
@@ -482,8 +447,8 @@ function tipHTML(f){
         var g=DATA.vals.gdp[f.iso3];
         if(g)h+='<div class="tt-row">GDP: '+fmtGdp(g.v)+' · GDP per capita '+fmtUSD(g.v/r.d.v)+'</div>';
       }else{
-        var p2=DATA.vals.pop[f.iso3];
-        if(p2)h+='<div class="tt-row">Population: '+fmtPop(p2.v)+' · GDP per capita '+fmtUSD(r.d.v/p2.v)+'</div>';
+        var p=DATA.vals.pop[f.iso3];
+        if(p)h+='<div class="tt-row">Population: '+fmtPop(p.v)+' · GDP per capita '+fmtUSD(r.d.v/p.v)+'</div>';
       }
     }
   }else{
@@ -550,7 +515,7 @@ function buildLegend(){
 function setMode(m){
   if(m===mode)return;
   mode=m;
-  location.hash=m==='gdp'?'gdp':'pop';
+  location.hash=m==='gdp'?'gdp':(m==='area'?'area':'pop');
   computeRecs();
   renderDots(true,false);
   buildPanel();
@@ -561,7 +526,7 @@ function setMode(m){
 function setShape(sm){
   if(sm===shapeMode)return;
   shapeMode=sm;
-  setup();
+  bigProjSetup();
   computeRecs();
   renderDots(true,true);
   buildPanel();
@@ -617,7 +582,7 @@ d3.select(window)
 svg.on('mousemove',function(e){
   var p=d3.pointer(e,svg.node());
   lastMouse=p;
-  if(lastSel&&!dragging)moveGhost(p[0],p[1]);
+  if(lastSel&&!dragging)updateGhost();
 });
 svg.on('mouseleave',function(){tooltip.style.display='none';});
 
@@ -625,7 +590,7 @@ var rsT;
 window.addEventListener('resize',function(){
   clearTimeout(rsT);
   rsT=setTimeout(function(){
-    setup();
+    bigProjSetup();
     computeRecs();
     renderDots(false,true);
     buildPanel();
@@ -633,12 +598,13 @@ window.addEventListener('resize',function(){
   },150);
 });
 
-setup();
+bigProjSetup();
 computeRecs();
 renderDots(true,true);
 buildPanel();
 updateHeader();
 buildLegend();
+refreshSel();
 svg.style('cursor','grab');
 })();
 </script>
