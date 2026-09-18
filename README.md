@@ -34,4 +34,4 @@ Everything (data + libraries) is embedded — the page is a single self-containe
 node build.js   # merges raw/ data + src/ template into index.html
 ```
 
-- URL params: `#gdp` opens in GDP mode, `?circle=1` switches to circle view, `?static=1` disables entry animation (also respects `prefers-reduced-motion`).
+- URL params: `#gdp` / `#pop` switch modes (True Area is the default), `?circle=1` switches to circle view, `?static=1` disables entry animation (also respects `prefers-reduced-motion`).

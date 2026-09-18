@@ -37,7 +37,7 @@ var MODES={
   area:{label:'True Area',fmt:fmtArea}
 };
 
-var mode=/gdp/i.test(location.hash)?'gdp':(/area/i.test(location.hash)?'area':'pop');
+var mode=/gdp/i.test(location.hash)?'gdp':(/pop/i.test(location.hash)?'pop':'area'); // 默认 True Area
 var shapeMode=!/circle/i.test(location.search);
 var ANIM=true;
 try{ANIM=!/static=1/.test(location.search)&&!matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
