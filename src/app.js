@@ -44,7 +44,7 @@ try{ANIM=!/static=1/.test(location.search)&&!matchMedia('(prefers-reduced-motion
 
 var recs=[],byIso={},maxV=1;
 var selSet=new Set(),lastSel=null,hoverIso=null;
-var tx=0,ty=0,k=1,tyMin=0,tyMax=0,dragging=false,dragMoved=false,lastPt=null,lastMouse=null;
+var tx=0,ty=0,k=1,dragging=false,dragMoved=false,lastPt=null,lastMouse=null;
 var firstRender=true;
 
 var metaByNum={};
@@ -99,7 +99,7 @@ var projection=d3.geoMercator();
 var path=d3.geoPath(projection);
 var ghostPath=d3.geoPath(projection);
 var ghostFeature={type:'Feature',geometry:{type:'Polygon',coordinates:[]}};
-var W=0,H=0,maxR=80;
+var W=0,H=0,maxR=80,yTopW=0,yBotW=0;
 
 function buildTiles(){
   gTiles.selectAll('g.tile').remove();
@@ -139,7 +139,7 @@ function setup(){
   svg.attr('viewBox','0 0 '+W+' '+H);
   var scale=W/(2*Math.PI); // world width exactly fills the viewport for seamless wrap
   projection.scale(scale).translate([W/2,H/2]).center([0,0])
-    .clipExtent([[-W,-H*1.3],[2*W,H*1.6]]); // trim only deep Antarctica, keep the Arctic pannable
+    .clipExtent([[-W,H/2-W/2],[2*W,H/2+W/2]]); // full Mercator world square (lat ±85.05°), poles included
   maxR=H*0.185;
   features.forEach(function(f){
     var p=projection(f.centroid);
@@ -152,15 +152,15 @@ function setup(){
   });
   buildTiles();
   k=1;tx=0;
-  var yT=projection([0,84])[1],yB=projection([0,-59])[1];
-  tyMin=H-yB;tyMax=-yT;
-  ty=Math.min(tyMax,Math.max(tyMin,H/2-(yT+yB)/2));
+  yTopW=H/2-W/2;yBotW=H/2+W/2; // top/bottom edges of the world square (±85.05°)
+  ty=Math.min(-yTopW,Math.max(H-yBotW,0)); // start equator-centered
   applyView();
 }
 
 function clampPan(){
   tx=((tx%W)+W)%W;
-  ty=Math.min(tyMax,Math.max(tyMin,ty));
+  var lo=H-yBotW*k,hi=-yTopW*k;
+  ty=lo<=hi?Math.min(hi,Math.max(lo,ty)):(lo+hi)/2;
 }
 function applyView(){
   clampPan();
