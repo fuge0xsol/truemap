@@ -334,10 +334,10 @@ function moveGhost(sx,sy){
   if(!r)return;
   if(shapeMode&&mode==='area'){
     // thetruesize 行为:轮廓在光标处按墨卡托重新投影 — 拖向赤道变小,拖向两极变大
+    // 注意:保留原始经度差(不归一化),否则跨日期变更线时轮廓会被投影到屏幕外
     var ll=projection.invert([mapX,mapY]);
     if(!ll)return;
     var dLon=ll[0]-r.f.centroid[0],dLat=ll[1]-r.f.centroid[1];
-    dLon=((dLon+180)%360+360)%360-180; // 经度差归一化到±180,避免不必要的跨线切割
     ghostFeature.geometry.type=r.f.geometry.type;
     ghostFeature.geometry.coordinates=shiftedGeometry(r.f.geometry,dLon,dLat);
     var d=ghostPath(ghostFeature)||r.f.pathD;
