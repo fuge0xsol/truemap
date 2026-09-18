@@ -340,14 +340,15 @@ function moveGhost(sx,sy){
     // 幽灵永不跨越反经线 — 任何拖放位置都完整显示
     var ll=projection.invert([mapX,mapY]);
     if(!ll)return;
-    var dLon=-ll[0]-r.f.centroid[0],dLat=ll[1]-r.f.centroid[1];
+    var dLon=ll[0]-r.f.centroid[0],dLat=ll[1]-r.f.centroid[1];
     ghostProjection.rotate([-ll[0],0]);
     ghostFeature.geometry.type=r.f.geometry.type;
     ghostFeature.geometry.coordinates=shiftedGeometry(r.f.geometry,dLon,dLat);
     var d=ghostPath(ghostFeature)||r.f.pathD;
+    var cxy=ghostProjection([ll[0],ll[1]])||[W/2,mapY]; // 幽灵质心的实际投影位置
     tiles.forEach(function(t){
       var lx=mapX-(t.i-1)*worldW;
-      t.gGhost.attr('transform','translate('+(lx-W/2)+','+(mapY-H/2)+')');
+      t.gGhost.attr('transform','translate('+(lx-cxy[0])+',0)');
       t.gShp.attr('d',d);
       t.gTxt.attr('x',lx).attr('y',mapY-8);
     });
