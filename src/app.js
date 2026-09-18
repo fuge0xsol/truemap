@@ -25,13 +25,19 @@ function fmtGdp(v){
   return '$'+Math.round(v).toLocaleString('en-US');
 }
 function fmtUSD(v){return '$'+Math.round(v).toLocaleString('en-US');}
+function fmtArea(v){
+  if(v>=1e6)return trim((v/1e6).toFixed(2))+'M km²';
+  if(v>=1e3)return Math.round(v/1e3).toLocaleString('en-US')+'K km²';
+  return Math.round(v).toLocaleString('en-US')+' km²';
+}
 
 var MODES={
   pop:{label:'Population',fmt:fmtPop},
-  gdp:{label:'GDP',fmt:fmtGdp}
+  gdp:{label:'GDP',fmt:fmtGdp},
+  area:{label:'True Area',fmt:fmtArea}
 };
 
-var mode=/gdp/i.test(location.hash)?'gdp':'pop';
+var mode=/gdp/i.test(location.hash)?'gdp':(/area/i.test(location.hash)?'area':'pop');
 var shapeMode=!/circle/i.test(location.search);
 var ANIM=true;
 try{ANIM=!/static=1/.test(location.search)&&!matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
@@ -64,7 +70,23 @@ features.forEach(function(f,i){
   f.centroid=bigCentroid(f.geometry);
 });
 
-function dataOf(iso3){var d=DATA.vals[mode][iso3];return d&&d.v>0?d:null;}
+var AREA_VALS=null,worldTotal=0;
+function getAreaVals(){ // km² per country, computed once from the geometry
+  if(!AREA_VALS){
+    AREA_VALS={};
+    var R2=6371*6371;
+    features.forEach(function(f){
+      if(f.iso3)AREA_VALS[f.iso3]={v:d3.geoArea(f)*R2,y:null};
+    });
+  }
+  return AREA_VALS;
+}
+
+function dataOf(iso3){
+  var src=mode==='area'?getAreaVals():DATA.vals[mode];
+  var d=src[iso3];
+  return d&&d.v>0?d:null;
+}
 
 var stage=document.getElementById('stage');
 var svg=d3.select('#map');
@@ -163,12 +185,13 @@ function computeRecs(){
   });
   recs.sort(function(a,b){return b.d.v-a.d.v;});
   var total=d3.sum(recs,function(r){return r.d.v;});
+  worldTotal=total;
   maxV=recs.length?recs[0].d.v:1;
   var maxArea=Math.PI*maxR*maxR;
   recs.forEach(function(r,i){
     r.rank=i+1;r.share=r.d.v/total;
     r.r=Math.max(1.1,maxR*Math.sqrt(r.d.v/maxV));
-    r.s=f2s(r.f,Math.max(maxArea*r.d.v/maxV,30));
+    r.s=mode==='area'?1:f2s(r.f,Math.max(maxArea*r.d.v/maxV,30)); // True Area 模式 s=1(真实比例)
   });
   byIso={};recs.forEach(function(r){byIso[r.f.iso3]=r;});
 }
@@ -283,7 +306,7 @@ function refreshSel(){
         t.gCirc.style('display',null).attr('r',r.r).attr('fill',RG_COLOR[r.f.rg]);
         t.gShp.style('display','none');
       }
-      t.gTxt.text(r.f.name+' · '+MODES[mode].label+' equal-area');
+      t.gTxt.text(r.f.name+' · '+(mode==='area'?'true size':MODES[mode].label+' equal-area'));
     }else{
       t.gGhost.style('display','none');
     }
@@ -309,14 +332,25 @@ function tipHTML(f){
   var r=byIso[f.iso3];
   var h='<div class="tt-name">'+f.name+'</div>';
   if(r){
-    h+='<div class="tt-row">'+MODES[mode].label+': <b>'+MODES[mode].fmt(r.d.v)+'</b> <span class="yr">('+r.d.y+')</span></div>';
-    h+='<div class="tt-row"><b>'+(r.share*100).toFixed(1)+'%</b> of world · Rank <b>#'+r.rank+'</b></div>';
-    if(mode==='pop'){
-      var g=DATA.vals.gdp[f.iso3];
-      if(g)h+='<div class="tt-row">GDP: '+fmtGdp(g.v)+' · GDP per capita '+fmtUSD(g.v/r.d.v)+'</div>';
+    if(mode==='area'){
+      h+='<div class="tt-row">Area: <b>'+fmtArea(r.d.v)+'</b> <span class="yr">(Natural Earth)</span></div>';
+      h+='<div class="tt-row"><b>'+(r.share*100).toFixed(1)+'%</b> of mapped land · Rank <b>#'+r.rank+'</b></div>';
+      var parts=[];
+      var p=DATA.vals.pop[f.iso3],g=DATA.vals.gdp[f.iso3];
+      if(p)parts.push('Population: '+fmtPop(p.v));
+      if(g)parts.push('GDP: '+fmtGdp(g.v));
+      if(p&&g)parts.push('GDP per capita '+fmtUSD(g.v/p.v));
+      if(parts.length)h+='<div class="tt-row">'+parts.join(' · ')+'</div>';
     }else{
-      var p=DATA.vals.pop[f.iso3];
-      if(p)h+='<div class="tt-row">Population: '+fmtPop(p.v)+' · GDP per capita '+fmtUSD(r.d.v/p.v)+'</div>';
+      h+='<div class="tt-row">'+MODES[mode].label+': <b>'+MODES[mode].fmt(r.d.v)+'</b> <span class="yr">('+r.d.y+')</span></div>';
+      h+='<div class="tt-row"><b>'+(r.share*100).toFixed(1)+'%</b> of world · Rank <b>#'+r.rank+'</b></div>';
+      if(mode==='pop'){
+        var g=DATA.vals.gdp[f.iso3];
+        if(g)h+='<div class="tt-row">GDP: '+fmtGdp(g.v)+' · GDP per capita '+fmtUSD(g.v/r.d.v)+'</div>';
+      }else{
+        var p2=DATA.vals.pop[f.iso3];
+        if(p2)h+='<div class="tt-row">Population: '+fmtPop(p2.v)+' · GDP per capita '+fmtUSD(r.d.v/p2.v)+'</div>';
+      }
     }
   }else{
     h+='<div class="tt-row dim">No data</div>';
@@ -356,12 +390,14 @@ function buildPanel(){
 }
 
 function updateHeader(){
-  document.getElementById('mLabel').textContent='World '+MODES[mode].label.toLowerCase();
+  document.getElementById('mLabel').textContent=mode==='area'?'Mapped land area':'World '+MODES[mode].label.toLowerCase();
   var w=DATA.wld[mode];
+  if(!w&&mode==='area'&&recs.length)w={v:worldTotal,y:null};
   document.getElementById('mTotal').textContent=w?MODES[mode].fmt(w.v):'—';
-  document.getElementById('mYear').textContent=w?('· Reference year '+w.y):'';
+  document.getElementById('mYear').textContent=w?(w.y?('· Reference year '+w.y):'· Natural Earth 110m'):'';
   document.getElementById('btn-pop').classList.toggle('on',mode==='pop');
   document.getElementById('btn-gdp').classList.toggle('on',mode==='gdp');
+  document.getElementById('btn-area').classList.toggle('on',mode==='area');
   document.getElementById('btn-shape').classList.toggle('on',shapeMode);
   document.getElementById('btn-circ').classList.toggle('on',!shapeMode);
 }
@@ -401,6 +437,7 @@ function setShape(sm){
 
 document.getElementById('btn-pop').addEventListener('click',function(){setMode('pop');});
 document.getElementById('btn-gdp').addEventListener('click',function(){setMode('gdp');});
+document.getElementById('btn-area').addEventListener('click',function(){setMode('area');});
 document.getElementById('btn-shape').addEventListener('click',function(){setShape(true);});
 document.getElementById('btn-circ').addEventListener('click',function(){setShape(false);});
 document.getElementById('q').addEventListener('input',function(e){
