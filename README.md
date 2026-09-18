@@ -1,4 +1,4 @@
-# 🌍 World Proportion Map — Population & GDP
+# 🌍 TrueMap — Population & GDP
 
 An interactive, thetruesize-style world map where **every country keeps its real border shape, but its area is rescaled to be proportional to its population or GDP**. Compare countries by equal-area replacement instead of circles.
 
@@ -6,8 +6,8 @@ An interactive, thetruesize-style world map where **every country keeps its real
 
 ## Live
 
-- GitHub Pages: https://fuge0xsol.github.io/world-proportion-map/
-- Cloudflare Pages: https://world-proportion-map.pages.dev/
+- GitHub Pages: https://fuge0xsol.github.io/truemap/
+- Cloudflare Pages: https://truemap.pages.dev/
 
 ## Features
 
