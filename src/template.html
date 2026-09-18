@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>World Proportion Map — Population &amp; GDP</title>
+<style>/*__CSS__*/</style>
+</head>
+<body>
+<header>
+  <div class="brand">🌍 World Proportion Map<small>Population &amp; GDP</small></div>
+  <div class="toggle">
+    <button id="btn-pop">Population</button>
+    <button id="btn-gdp">GDP</button>
+  </div>
+  <div class="toggle">
+    <button id="btn-shape">Country Shapes</button>
+    <button id="btn-circ">Circles</button>
+  </div>
+  <div class="hstat" id="hstat">
+    <span id="mLabel">World population</span>
+    <b id="mTotal">—</b>
+    <span id="mYear"></span>
+  </div>
+</header>
+<div id="stage">
+  <svg id="map"></svg>
+  <aside id="panel">
+    <div class="p-head"><input id="q" placeholder="🔍 Search countries…"></div>
+    <div id="rank"></div>
+    <div class="p-foot">Shape area ∝ value · Click a country to color &amp; compare<br>Data: World Bank (latest available year per country) · Projection: Mercator · Basemap: Natural Earth</div>
+  </aside>
+  <div id="legend"></div>
+  <div id="hint">💡 Click a country: color it + equal-area outline follows the mouse (multi-select to stack, click again to remove) · Esc clears · Drag to pan (infinite horizontal) · Scroll to zoom</div>
+  <div id="errbar"></div>
+</div>
+<div id="tooltip"></div>
+<script type="application/json" id="world-topo">__TOPO__</script>
+<script type="application/json" id="app-data">__DATA__</script>
+<script>__D3__</script>
+<script>__TOPOJSON__</script>
+<script>__APP__</script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;overflow:hidden;background:#070a12;color:#e8ecf4;font:14px/1.5 "Segoe UI","Microsoft YaHei",system-ui,sans-serif}
+header{position:fixed;inset:0 0 auto 0;height:54px;display:flex;align-items:center;gap:16px;padding:0 16px;background:rgba(11,16,30,.85);backdrop-filter:blur(10px);border-bottom:1px solid #1c2742;z-index:30}
+.brand{font-weight:700;font-size:16px;letter-spacing:.5px;white-space:nowrap}
+.brand small{color:#8fa0c5;font-weight:500;margin-left:6px;font-size:12px}
+.toggle{display:flex;background:#131c33;border:1px solid #27365c;border-radius:999px;padding:3px;flex:none}
+.toggle button{border:0;background:transparent;color:#9db0d6;padding:5px 20px;border-radius:999px;cursor:pointer;font-size:13.5px;font-family:inherit;transition:.2s}
+.toggle button.on{background:linear-gradient(135deg,#2f6bff,#8a3ffc);color:#fff;font-weight:600}
+.hstat{margin-left:auto;text-align:right;font-size:11.5px;color:#8fa0c5;white-space:nowrap;line-height:1.35}
+.hstat b{display:block;font-size:16px;color:#fff;font-variant-numeric:tabular-nums}
+#stage{position:fixed;inset:54px 0 0 0}
+#map{display:block;width:100%;height:100%;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none}
+.lg-t{font-size:10.5px;color:#62759f;margin-bottom:2px}
+#panel{position:absolute;left:14px;top:14px;bottom:14px;width:302px;display:flex;flex-direction:column;background:rgba(11,16,30,.82);backdrop-filter:blur(12px);border:1px solid #1c2742;border-radius:14px;z-index:20;overflow:hidden}
+.p-head{padding:10px 10px 8px}
+#q{width:100%;background:#0d1526;border:1px solid #27365c;border-radius:9px;color:#e8ecf4;padding:7px 11px;font-size:13px;outline:none;font-family:inherit}
+#q:focus{border-color:#3d5aa8}
+#rank{flex:1;overflow:auto;padding:2px 6px 8px}
+.row{position:relative;display:flex;align-items:baseline;gap:7px;padding:6px 8px 7px;border-radius:8px;cursor:pointer;font-size:13px}
+.row:hover{background:#16203a}
+.row.act{background:#1b2a52}
+.rk{width:20px;text-align:right;color:#5c6f9c;font-size:11px;flex:none;font-variant-numeric:tabular-nums}
+.dotc{width:8px;height:8px;border-radius:50%;flex:none;align-self:center}
+.nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vv{color:#dfe6f5;font-variant-numeric:tabular-nums;font-size:12.5px}
+.sh{width:46px;text-align:right;color:#5c6f9c;font-size:11px;font-variant-numeric:tabular-nums;flex:none}
+.bar{position:absolute;left:8px;bottom:2px;height:2px;border-radius:2px;background:linear-gradient(90deg,#2f6bff,#8a3ffc);opacity:.75}
+.p-foot{padding:9px 12px;font-size:10.5px;color:#62759f;border-top:1px solid #1c2742;line-height:1.6}
+#legend{position:absolute;right:14px;bottom:14px;display:flex;flex-direction:column;gap:5px;background:rgba(11,16,30,.82);backdrop-filter:blur(12px);border:1px solid #1c2742;border-radius:12px;padding:10px 12px;z-index:20;font-size:12px}
+.lg{display:flex;align-items:center;gap:7px;color:#b9c6e4}
+.lg i{width:10px;height:10px;border-radius:50%}
+#hint{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);background:rgba(11,16,30,.85);border:1px solid #1c2742;padding:6px 16px;border-radius:999px;font-size:12px;color:#9db0d6;z-index:20;white-space:nowrap;max-width:70%;overflow:hidden;text-overflow:ellipsis}
+#tooltip{position:fixed;display:none;pointer-events:none;background:rgba(8,12,22,.94);border:1px solid #2b3c68;border-radius:10px;padding:9px 12px;font-size:12.5px;z-index:40;max-width:280px;box-shadow:0 8px 28px rgba(0,0,0,.55)}
+.tt-name{font-weight:700;font-size:13.5px;margin-bottom:3px}
+.tt-name span{color:#8fa0c5;font-weight:500;font-size:11.5px}
+.tt-row{color:#c4d0ea}
+.tt-row b{color:#fff}
+.tt-row .yr{color:#6d7fa8;font-size:11px}
+.tt-row.dim{color:#7c8bab}
+#errbar{display:none;position:fixed;top:64px;left:50%;transform:translateX(-50%);background:#6b1d1d;border:1px solid #a33;color:#ffd9d9;padding:8px 16px;border-radius:9px;z-index:99;font-size:13px}
+.land{fill:#151e33;stroke:#2b3a5f}
+@media(max-width:900px){#panel,#hstat{display:none}}
