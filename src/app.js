@@ -320,6 +320,8 @@ function updateGhost(){
   var s=1;
   if(mode==='area'){
     s=Math.cos(r.f.centroid[1]*Math.PI/180)/Math.max(0.087,Math.cos(latC*Math.PI/180)); // 真实尺寸随纬度 sec(φ) 变化
+  }else{
+    s=r.s||1; // 等比例轮廓:与地图上该国着色形状同尺寸
   }
   gGhost.style('display',null);
   if(shapeMode){
